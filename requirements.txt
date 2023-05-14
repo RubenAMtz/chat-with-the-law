@@ -1,0 +1,9 @@
+inference-schema==1.4
+azureml-inference-server-http==0.7.6
+azure-ai-ml
+azure-identity
+langchain==0.0.152
+python-dotenv
+openai
+supabase
+chromadb
