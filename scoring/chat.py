@@ -35,7 +35,7 @@ def init():
 
 	env_path = pathlib.Path(f"../.env.dev")
 	logging.info(f"Env path: {os.listdir(env_path.parents[0])}")
-	load_dotenv(env_path.parents[0] / '.env.dev', verbose=True)
+	load_dotenv(env_path.parents[0] / '.env.prod', verbose=True)
 	openai_key = os.getenv("OPENAI_API_KEY")
 	openai.api_type = "azure"
 	openai.api_version = "2022-12-01"
@@ -49,8 +49,8 @@ def init():
 	logging.info(f"Contents of model dir lvl 0 {os.listdir(rd.parents[0])}")
 	logging.info(f"Contents of model dir lvl 1 {os.listdir(rd.parents[1])}")
 	logging.info(f"Contents of model dir lvl 2 {os.listdir(rd.parents[2])}")
-	logging.info(f"Contents of model dir lvl 2 {os.listdir(rd.parents[2] / 'chat/embeddings/leyes_chromadb_512_40_ada_002_recursive')}")
-	path_to_embeddings = f"{rd.parents[2] / 'chat/embeddings/leyes_chromadb_512_40_ada_002_recursive'}"
+	logging.info(f"Contents of model dir lvl 2 {os.listdir(rd.parents[2] / 'hybridsearch-chat/embeddings/leyes_chromadb_512_40_ada_002_recursive')}")
+	path_to_embeddings = f"{rd.parents[2] / 'hybridsearch-chat/embeddings/leyes_chromadb_512_40_ada_002_recursive'}"
 	
 	db = Chroma(persist_directory=f"{path_to_embeddings}", embedding_function=embeddings, collection_name='abogado_gpt')
 	
@@ -62,7 +62,7 @@ def init():
 	logging.info("LLM loaded")
 	
 	global hybrid_search
-	hybrid_search = CustomHybridSearchTool(llm=llm, db=db, embeddings=embeddings, logger=logging, top_k_wider_search=62, top_k_reranked_search=4, verbose=True)
+	hybrid_search = CustomHybridSearchTool(llm=llm, db=db, embeddings=embeddings, logger=logging, top_k_wider_search=16, top_k_reranked_search=4, verbose=True)
 	logging.info("Hybrid search loaded")
 
 	openai.api_version = "2023-03-15-preview"

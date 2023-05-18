@@ -12,7 +12,7 @@ from azure.identity import DefaultAzureCredential
 from dotenv import load_dotenv
 # from keys import subscription_id, resource_group, workspace_name
 
-dotenv_path = f".env.dev"
+dotenv_path = f".env.prod"
 load_dotenv(dotenv_path=dotenv_path)
 
 subscription_id = os.getenv("AZUREML_SUBSCRIPTION_ID")
@@ -50,7 +50,7 @@ blue_deployment = ManagedOnlineDeployment(
     ),
     instance_type="Standard_F4s_v2",
     instance_count=1,
-    request_settings=OnlineRequestSettings(request_timeout_ms=30000)
+    request_settings=OnlineRequestSettings(request_timeout_ms=70000)
 )
 
 try: 

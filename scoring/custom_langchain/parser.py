@@ -6,7 +6,7 @@ from langchain.agents.agent import AgentOutputParser
 from .prompts import FORMAT_INSTRUCTIONS
 from langchain.schema import AgentAction, AgentFinish, OutputParserException
 
-FINAL_ANSWER_ACTION = "`Respuesta final`:"
+FINAL_ANSWER_ACTION = "```Respuesta final```:"
 
 
 class CustomChatOutputParser(AgentOutputParser):
@@ -15,16 +15,15 @@ class CustomChatOutputParser(AgentOutputParser):
         return FORMAT_INSTRUCTIONS
 
     def parse(self, text: str) -> Union[AgentAction, AgentFinish]:
-        if FINAL_ANSWER_ACTION in text:
-            return AgentFinish(
-                {"output": text.split(FINAL_ANSWER_ACTION)[-1].strip()}, text
-            )
         try:
             action = text.split("```")[1]
             response = json.loads(action.strip())
             return AgentAction(response["action"], response["action_input"], text)
-
         except Exception:
+            if FINAL_ANSWER_ACTION in text:
+                return AgentFinish(
+                    {"output": text.split(FINAL_ANSWER_ACTION)[-1].strip()}, text
+                )
             raise OutputParserException(f"Could not parse LLM output: {text}")
 
 

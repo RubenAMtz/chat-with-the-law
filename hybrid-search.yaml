@@ -16,3 +16,4 @@ dependencies:
     - chromadb
     - supabase
     - tiktoken
+    - banana-dev

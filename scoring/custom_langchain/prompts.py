@@ -45,7 +45,7 @@ PREFIX = """Response las siguientes preguntas lo mejor que pueda, proporciona ej
 FORMAT_INSTRUCTIONS =  """La forma en que usa las herramientas es especificando un blob json.
 Específicamente, este json debe tener una llave `action` (con el nombre de la herramienta a usar) y una llave `action_input` (con la entrada a la herramienta que va aquí).
 
-Los únicos valores que deben estar en el campo "action" son: {tool_names}
+Los únicos valores que se permiten incluir en el campo "action" son: {tool_names}
 
 El $JSON_BLOB solo debe contener una SOLA acción, NO devuelva una lista de múltiples acciones. Aquí hay un ejemplo de un $JSON_BLOB válido:
 
@@ -64,14 +64,12 @@ Acción:
 ```
 $JSON_BLOB
 ```
-Observación: el resultado detallado de la acción
-Pensamiento: ... (este proceso de Pensamiento/Acción/Observación lo puedes repetir N veces)
-
+... (este proceso de Pensamiento/Acción/Observación lo puedes repetir N veces)
 Pensamiento: ahora sé la respuesta final
-Respuesta final: la respuesta final a la pregunta de entrada original, incluyendo ejemplos, analogías y las referencias proporcionadas por la herramienta."""
+```Respuesta final```: la respuesta final a la pregunta de entrada original, incluyendo ejemplos, analogías y las referencias proporcionadas por la herramienta."""
 
 
-SUFFIX = """¡Comienza! Recordatorio de usar siempre los caracteres exactos `Respuesta final` al responder. 
+SUFFIX = """¡Comienza! Recordatorio de usar siempre los caracteres exactos ```Respuesta final``` al responder. 
 Previo historial de conversación:
 {chat_history}
 

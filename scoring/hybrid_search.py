@@ -10,6 +10,7 @@ import logging
 import pathlib
 from langchain.llms import AzureOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
+import banana_dev as banana
 
 
 # from sentence_transformers import CrossEncoder
@@ -18,7 +19,7 @@ from langchain.vectorstores import Chroma
 
 from dotenv import load_dotenv
 
-env_path = pathlib.Path(f"../.env.dev")
+env_path = pathlib.Path(f"../.env.prod")
 load_dotenv(dotenv_path=env_path)
 
 
@@ -241,7 +242,7 @@ class CustomHybridSearchTool(BaseTool):
 	Uses a reranker model to rerank the top k documents retrieved from the database.
 	"""
 	name: str = "La ley"
-	description: str = "Usa esta herramienta para contestar a las preguntas de los humanos."
+	description: str = "Esta herramienta contiene informacion relacionada a todas las leyes del pais, usala para contestar preguntas que esten relacionadas a temas que tengan que ver con la ley, justicia, etc."
 	llm: AzureOpenAI = None
 	db: Chroma = None
 	embeddings: OpenAIEmbeddings = None
@@ -376,6 +377,7 @@ class CustomHybridSearchTool(BaseTool):
 		{text}
 		================
 		Resumen:
+
 		"""]).generations[0][0].text.replace('\n', '')
 	
 	
@@ -422,7 +424,7 @@ class CustomHybridSearchTool(BaseTool):
 		self.top_documents_wider_search_by_embeddings = self.db.similarity_search(query=user_input, k=self.top_k_wider_search)
 		
 
-	def top_reranked_documents(self, user_input: str, top_documents: List[Document]) -> List[Document]:
+	def top_reranked_documents(self, user_input: str, top_documents: List[Document]) -> str:#List[Document]:
 		"""
 		Reranks the top k documents using the reranker model.
 		"""
@@ -432,7 +434,8 @@ class CustomHybridSearchTool(BaseTool):
 		
 		top_k = min(self.top_k_reranked_search, len(pairs))
 		# scores = self.reranker_model.predict(pairs, show_progress_bar=True)
-		scores = self.call_reranker(pairs)
+		# scores = self.call_reranker(pairs)
+		scores = self.call_reranker_banana(pairs)
 		# reranked_scores = torch.topk(torch.from_numpy(scores), k=top_k)
 		reranked_scores = np.argsort(scores)[::-1][:top_k]
 		reranked_scores = (scores[reranked_scores], reranked_scores)
@@ -455,7 +458,8 @@ class CustomHybridSearchTool(BaseTool):
 			self.logger.info(f"Resultado de la busqueda: \n{parsed_response}")
 		
 		# return only Document objects
-		return [r[0] for r in top_reranked_documents_]
+		# return [r[0] for r in top_reranked_documents_]
+		return parsed_response
 	
 	def _run(self, user_input) -> List[Document]:
 		"""
@@ -467,16 +471,24 @@ class CustomHybridSearchTool(BaseTool):
 		self.extract_keywords(user_input)
 		self.top_k_documents_by_keyword(user_input)
 		self.top_k_documents_by_embedding(user_input)
-		res = self.top_reranked_documents(user_input, self.top_documents_wider_search_by_keywords)
-		relevant_res_keywords = self.extract_relevant_info(res, user_input)
-		res = self.top_reranked_documents(user_input, self.top_documents_wider_search_by_embeddings)
-		relevant_res_similarity = self.extract_relevant_info(res, user_input)
-		res = relevant_res_keywords + relevant_res_similarity
+		# res = self.top_reranked_documents(user_input, self.top_documents_wider_search_by_keywords)
+		# relevant_res_keywords = self.extract_relevant_info(res, user_input)
+		# res = self.top_reranked_documents(user_input, self.top_documents_wider_search_by_embeddings)
+		# relevant_res_similarity = self.extract_relevant_info(res, user_input)
+		# res = relevant_res_keywords + relevant_res_similarity
+		# relevant_res = self.extract_relevant_info(res, user_input)
+		
+		# we now mix documents from both searches
+		mixed_documents = self.top_documents_wider_search_by_keywords + self.top_documents_wider_search_by_embeddings
+		res = self.top_reranked_documents(user_input, mixed_documents)
 		relevant_res = self.extract_relevant_info(res, user_input)
 		res = self.summarize(relevant_res, user_input)
 		return res
 	
 	def call_reranker(self, pairs: List[List[Union[str, Document]]]) -> np.ndarray[float]:
+		"""
+		Reranker using Azure ML.
+		"""
 
 		def allowSelfSignedHttps(allowed):
 			# bypass the server certificate verification on client side
@@ -524,6 +536,26 @@ class CustomHybridSearchTool(BaseTool):
 		result = ast.literal_eval(result.decode('utf-8'))
 		# logging.info("Output from AzureML: {}".format(result))
 		return np.array(result)
+	
+	def call_reranker_banana(self, pairs: List[List[Union[str, Document]]]) -> np.ndarray[float]:
+		"""
+		Re-ranking using banana deployment.
+		"""
+		#  create object out of pairs
+		logging.info("Pairs: {}".format(pairs))
+		body = {
+			"inputs": {
+				"source_sentence": pairs[0][0],
+				"sentences": [pair[1] for pair in pairs]
+			}
+		}
+		logging.info("Body: {}".format(body))
+
+		api_key = os.environ.get("BANANA_API_KEY", "")
+		model_key = os.environ.get("BANANA_MODEL_KEY", "")
+		out = banana.run(api_key, model_key, body)
+		return np.array(out["modelOutputs"][0]["outputs"])
+
 	
 	async def _arun(self, query: str) -> str:
 		"""Use the tool asynchronously."""
