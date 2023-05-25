@@ -7,6 +7,8 @@ from .prompts import FORMAT_INSTRUCTIONS
 from langchain.schema import AgentAction, AgentFinish, OutputParserException
 
 FINAL_ANSWER_ACTION = "```Respuesta final```:"
+TOOL_NAMES = ['La ley', 'La Ley']
+WEAK_FINAL_ANSWER_ACTION = "Respuesta final:"
 
 
 class CustomChatOutputParser(AgentOutputParser):
@@ -18,11 +20,17 @@ class CustomChatOutputParser(AgentOutputParser):
         try:
             action = text.split("```")[1]
             response = json.loads(action.strip())
+            if response['action'] not in TOOL_NAMES:
+                raise ValueError(f"Action {response['action']} not in {TOOL_NAMES}")
             return AgentAction(response["action"], response["action_input"], text)
         except Exception:
             if FINAL_ANSWER_ACTION in text:
                 return AgentFinish(
                     {"output": text.split(FINAL_ANSWER_ACTION)[-1].strip()}, text
+                )
+            elif WEAK_FINAL_ANSWER_ACTION in text:
+                return AgentFinish(
+                    {"output": text.split(WEAK_FINAL_ANSWER_ACTION)[-1].strip()}, text
                 )
             raise OutputParserException(f"Could not parse LLM output: {text}")
 

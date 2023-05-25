@@ -36,6 +36,7 @@ def init():
 	env_path = pathlib.Path(f"../.env.dev")
 	logging.info(f"Env path: {os.listdir(env_path.parents[0])}")
 	load_dotenv(env_path.parents[0] / '.env.prod', verbose=True)
+
 	openai_key = os.getenv("OPENAI_API_KEY")
 	openai.api_type = "azure"
 	openai.api_version = "2022-12-01"
@@ -45,11 +46,6 @@ def init():
 
 	logging.info(f"Embeddings dir: {db_dir}")
 
-	logging.info(f"Contents of model dir {os.listdir(rd)}")
-	logging.info(f"Contents of model dir lvl 0 {os.listdir(rd.parents[0])}")
-	logging.info(f"Contents of model dir lvl 1 {os.listdir(rd.parents[1])}")
-	logging.info(f"Contents of model dir lvl 2 {os.listdir(rd.parents[2])}")
-	logging.info(f"Contents of model dir lvl 2 {os.listdir(rd.parents[2] / 'hybridsearch-chat/embeddings/leyes_chromadb_512_40_ada_002_recursive')}")
 	path_to_embeddings = f"{rd.parents[2] / 'hybridsearch-chat/embeddings/leyes_chromadb_512_40_ada_002_recursive'}"
 	
 	db = Chroma(persist_directory=f"{path_to_embeddings}", embedding_function=embeddings, collection_name='abogado_gpt')
@@ -90,13 +86,19 @@ def init():
     param_name="data", param_type=StandardPythonParameterType({
             "inputs": {
                 "query": "puedo manejar borracho?",
-				"user_id": "1234-1234-1234-1234",
+				"user_id": "162b0d7c-1bc9-4c20-8a77-2031d21cce47",
 				"user_name": "RubenRuben"
             }
         })
 )
 
-@output_schema(output_type=StandardPythonParameterType( "abc" ))
+@output_schema(
+	output_type=StandardPythonParameterType( {
+	"outputs": {
+		"response": "Hola, soy un bot. Puedo ayudarte con tus dudas legales. ¿En qué te puedo ayudar?",
+		"extracts": "these are the extracts"
+		}
+ 	}))
 
 def run(data):
 
@@ -111,16 +113,23 @@ def run(data):
 	user_id = data["inputs"]["user_id"]
 	user_name = data["inputs"]["user_name"]
 
+	start_supabase = time.time()
+	logging.info("Supabase data loading...")
 	supabase_url: str = os.environ.get("SUPABASE_URL")
 	supabase_key: str = os.environ.get("SUPABASE_API_KEY")
 	supabase_client: Client = create_client(supabase_url, supabase_key)
-	logging.info("Supabase loaded")
-
+	
+	
 	history_data = supabase_client.table('message')\
 		.select("*")\
 		.eq("user_id", user_id)\
 		.order('created_at', desc=True)\
 		.execute()
+	# take only the last 5 messages
+	history_data.data = history_data.data[:5]
+	end_supabase = time.time()
+	logging.info(f"Supabase loading time: {end_supabase - start_supabase}")
+
     
 	memory = ConversationBufferWindowMemory(
 		memory_key="chat_history", # import to align with agent prompt
@@ -167,8 +176,20 @@ def run(data):
 	end = time.time()
 	logging.info(f"Time elapsed: {end - start}")
 	logging.info(f"Output res: {res}")
-	logging.info(f"Res dtype {type(res)}")
-	return res
+	extracts = conversational_agent.tools[0].references
+	# reset agent references for next run
+	conversational_agent.tools[0].references = ""
+
+	# output should be: "outputs": {
+		# "response": "Hola, soy un bot. Puedo ayudarte con tus dudas legales. ¿En qué te puedo ayudar?",
+		# "extracts": ["this is an extract", "this is another extract"]
+		# }
+	return {
+		"outputs": {
+			"response": res,
+			"extracts": extracts
+		}
+	}
 
 
 # loading the model through the parent folder of the model

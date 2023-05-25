@@ -11,6 +11,7 @@ import pathlib
 from langchain.llms import AzureOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 import banana_dev as banana
+import cohere
 
 
 # from sentence_transformers import CrossEncoder
@@ -255,6 +256,7 @@ class CustomHybridSearchTool(BaseTool):
 	top_documents_reranked_search_by_keywords: List[Document] = None
 	top_documents_wider_search_by_embeddings: List[Document] = None
 	top_documents_reranked_search_by_embeddings: List[Document] = None
+	references: str = None
 	
 	def __init__(self, llm, db, embeddings, logger, top_k_wider_search=100, top_k_reranked_search=10, verbose=False):
 		super().__init__(return_direct=True, verbose=True)
@@ -435,14 +437,23 @@ class CustomHybridSearchTool(BaseTool):
 		top_k = min(self.top_k_reranked_search, len(pairs))
 		# scores = self.reranker_model.predict(pairs, show_progress_bar=True)
 		# scores = self.call_reranker(pairs)
-		scores = self.call_reranker_banana(pairs)
-		# reranked_scores = torch.topk(torch.from_numpy(scores), k=top_k)
-		reranked_scores = np.argsort(scores)[::-1][:top_k]
-		reranked_scores = (scores[reranked_scores], reranked_scores)
+		# scores = self.call_reranker_cohere(pairs)
+		scores = self.call_reranker_cohere(pairs)
+		# coheres returns ordered list of documents by score
+		if isinstance(scores, np.ndarray):
+			reranked_scores = np.argsort(scores)[::-1][:top_k]
+			reranked_scores = (scores[reranked_scores], reranked_scores)
 
-		top_reranked_documents_ = []
-		for score, idx in zip(reranked_scores[0], reranked_scores[1]):
-			top_reranked_documents_.append((top_documents[idx], score))
+			top_reranked_documents_ = []
+			for score, idx in zip(reranked_scores[0], reranked_scores[1]):
+				top_reranked_documents_.append((top_documents[idx], score))
+		else:
+			top_reranked_documents_ = []
+			for index, (score, idx) in enumerate(scores):
+				top_reranked_documents_.append((top_documents[idx], score))
+				if (index + 1) == top_k:
+					break
+				
 
 		parsed_response = ""
 		if self.verbose:
@@ -453,7 +464,7 @@ class CustomHybridSearchTool(BaseTool):
 				parsed_response += "\n"
 				parsed_response += "Nivel de Justicia: " + r.metadata['nivel de justicia']
 				parsed_response += "\n"
-				parsed_response += "Score: " + str(round(score.item(), 2)) # item is float
+				parsed_response += "Score: " + str(round(score, 2)) # item is float
 				parsed_response += "\n"
 			self.logger.info(f"Resultado de la busqueda: \n{parsed_response}")
 		
@@ -481,11 +492,12 @@ class CustomHybridSearchTool(BaseTool):
 		# we now mix documents from both searches
 		mixed_documents = self.top_documents_wider_search_by_keywords + self.top_documents_wider_search_by_embeddings
 		res = self.top_reranked_documents(user_input, mixed_documents)
+		self.references = res
 		relevant_res = self.extract_relevant_info(res, user_input)
 		res = self.summarize(relevant_res, user_input)
 		return res
 	
-	def call_reranker(self, pairs: List[List[Union[str, Document]]]) -> np.ndarray[float]:
+	def call_reranker(self, pairs: List[List[Union[str, str]]]) -> np.ndarray[float]:
 		"""
 		Reranker using Azure ML.
 		"""
@@ -537,7 +549,7 @@ class CustomHybridSearchTool(BaseTool):
 		# logging.info("Output from AzureML: {}".format(result))
 		return np.array(result)
 	
-	def call_reranker_banana(self, pairs: List[List[Union[str, Document]]]) -> np.ndarray[float]:
+	def call_reranker_banana(self, pairs: List[List[Union[str, str]]]) -> np.ndarray[float]:
 		"""
 		Re-ranking using banana deployment.
 		"""
@@ -556,7 +568,33 @@ class CustomHybridSearchTool(BaseTool):
 		out = banana.run(api_key, model_key, body)
 		return np.array(out["modelOutputs"][0]["outputs"])
 
+	def call_reranker_cohere(self, pairs: List[List[Union[str, str]]]) -> List[Tuple[float, int]]:
+		"""
+		Re-ranking using coheres re-ranker
+
+		Args:
+			pairs (List[List[Union[str, str]]]): list of list, where each list contains the query and the document to be re-ranked
+		"""
+		# documents should be a list of strings
+		# query should be a string
+		co = cohere.Client(os.environ.get("COHERE_API_KEY", ""))
+
+		query = pairs[0][0]
+		documents = [pair[1] for pair in pairs]
+		logging.info("Query: {}".format(query))
+		logging.info("Documents: {}".format(documents))
+		results = co.rerank(query=query, documents=documents, top_n=10, model='rerank-multilingual-v2.0') # Change top_n to change the number of results returned. If top_n is not passed, all results will be returned.
+		for idx, r in enumerate(results):
+			print(f"Document Rank: {idx + 1}, Document Index: {r.index}")
+			print(f"Document: {r.document['text']}")
+			print(f"Relevance Score: {r.relevance_score:.2f}")
+			print("\n")
+		# return score and index
+		return [(r.relevance_score, r.index) for r in results]
 	
 	async def _arun(self, query: str) -> str:
 		"""Use the tool asynchronously."""
 		raise NotImplementedError("This tool does not support async")
+	
+	
+

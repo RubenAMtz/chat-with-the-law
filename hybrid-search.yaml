@@ -17,3 +17,4 @@ dependencies:
     - supabase
     - tiktoken
     - banana-dev
+    - cohere
