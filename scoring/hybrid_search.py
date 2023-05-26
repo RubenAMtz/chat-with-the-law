@@ -479,8 +479,8 @@ class CustomHybridSearchTool(BaseTool):
 		self.logger.info(f"Pregunta del usuario: {user_input}")
 		user_input = self.augment_user_input(user_input)
 		self.logger.info(f"Pregunta del usuario aumentada: {user_input}")
-		self.extract_keywords(user_input)
-		self.top_k_documents_by_keyword(user_input)
+		# self.extract_keywords(user_input)
+		# self.top_k_documents_by_keyword(user_input)
 		self.top_k_documents_by_embedding(user_input)
 		# res = self.top_reranked_documents(user_input, self.top_documents_wider_search_by_keywords)
 		# relevant_res_keywords = self.extract_relevant_info(res, user_input)
@@ -490,7 +490,8 @@ class CustomHybridSearchTool(BaseTool):
 		# relevant_res = self.extract_relevant_info(res, user_input)
 		
 		# we now mix documents from both searches
-		mixed_documents = self.top_documents_wider_search_by_keywords + self.top_documents_wider_search_by_embeddings
+		# mixed_documents = self.top_documents_wider_search_by_keywords + self.top_documents_wider_search_by_embeddings
+		mixed_documents = self.top_documents_wider_search_by_embeddings
 		res = self.top_reranked_documents(user_input, mixed_documents)
 		self.references = res
 		relevant_res = self.extract_relevant_info(res, user_input)

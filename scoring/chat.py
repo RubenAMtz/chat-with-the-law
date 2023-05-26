@@ -58,7 +58,7 @@ def init():
 	logging.info("LLM loaded")
 	
 	global hybrid_search
-	hybrid_search = CustomHybridSearchTool(llm=llm, db=db, embeddings=embeddings, logger=logging, top_k_wider_search=16, top_k_reranked_search=4, verbose=True)
+	hybrid_search = CustomHybridSearchTool(llm=llm, db=db, embeddings=embeddings, logger=logging, top_k_wider_search=100, top_k_reranked_search=4, verbose=True)
 	logging.info("Hybrid search loaded")
 
 	openai.api_version = "2023-03-15-preview"
