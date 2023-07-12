@@ -1,6 +1,6 @@
 # Chat with the law
 
-This is a custom implementation of ChatGPT + LangChain + 700+ documents of the law to be accessed as an endpoint API hosted in Azure.
+This is a custom implementation of ChatGPT + LangChain + 700+ documents of the law to be accessed as an endpoint API hosted in Azure. Chat experience is optimized for the accuracy of responses at the expense of speed.
 
 ## Requirements
 `pip install -r requirements.txt`
